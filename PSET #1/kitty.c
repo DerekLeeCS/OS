@@ -52,7 +52,6 @@ int main( int argc, char** argv ) {
     if ( fdOut == -1 ) {
 
       fprintf( stderr, "Cannot open output file: %s\n", fileOut );
-      perror( "Error:" );
       return -1;
 
     }
@@ -82,7 +81,6 @@ int main( int argc, char** argv ) {
         // In case there is an error closing the file
         if ( close( fdTemp ) < 0 ) {
 
-          fprintf( stderr, "Error: Cannot close input file: %s\n", argv[i] );
           perror( "Error" );
           return -1;
 
@@ -254,7 +252,7 @@ int kitty( char* fileIn, int fdOut ) {
 
   }
 
-  fprintf( stderr, "Transferred %d bytes and made %d read system call(s) and %d write system call(s).\n",
+  fprintf( stderr, "Transferred %d bytes and made %d read system call(s) and %d write system call(s).\n", 
            szTransferred, numReadCalls, numWriteCalls );
 
   if ( isBinary ) {
