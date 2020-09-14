@@ -254,7 +254,7 @@ int kitty( char* fileIn, int fdOut ) {
 
   }
 
-  fprintf( stderr, "Transferred %d bytes and made %d read system call(s) and %d write system call(s).\n",
+  fprintf( stderr, "\nTransferred %d bytes and made %d read system call(s) and %d write system call(s).\n",
            szTransferred, numReadCalls, numWriteCalls );
 
   if ( isBinary ) {
