@@ -194,11 +194,7 @@ int kitty( char* fileIn, int fdOut ) {
     numReadCalls++;
 
     // No error
-    if ( szRead >= 0 ) {
-
-      // Reached EoF
-      if ( szRead == 0 )
-        break;
+    if ( szRead > 0 ) {
 
       // Parse for binary
       if ( !isBinary ) {
@@ -220,25 +216,18 @@ int kitty( char* fileIn, int fdOut ) {
       numWriteCalls++;
 
       // No error
-      if ( szWrite >= 0 ) {
-
+      // Writing 0 bytes should be an error
+      if ( szWrite > 0 )
         szTransferred += szWrite;
 
-        // Reached EoF
-        if ( szWrite < SIZE_BUF )
-          break;
-
-      }
       // Write Error
       else
         return -3;
 
-      // Should never happen?
-      // Reached EoF
-      if ( szRead < SIZE_BUF )
-        break;
-
     }
+    // Reached EoF
+    else if ( szRead == 0 )
+      break;
     // Read Error
     else
       return -2;
