@@ -30,11 +30,12 @@ int main() {
     cin >> removeComments;
     cout << "\n";
 
-    size_t lastIndex = fileIn.find_last_of(".");
-    string rawName = fileIn.substr( 0, lastIndex );
+    // Breaks string into rawName + fileExtension
+    size_t lastIndex = fileIn.find_last_of( "." );
+    string fileName = fileIn.substr( 0, lastIndex );
     string fileExtension = fileIn.substr( lastIndex, fileIn.length() );
 
-    fileOut = rawName + "Truncated" + fileExtension;
+    fileOut = fileName + "Truncated" + fileExtension;
 
     ifstream input( fileIn );
     ofstream output( fileOut );
@@ -72,7 +73,7 @@ int main() {
 
     }
 
-    cout << "Truncation completed.\n";
+    cout << "Truncation completed." << "\n";
     cout << "File written to: " << fileOut << endl;
 
     return 0;
@@ -80,7 +81,6 @@ int main() {
 }
 
 
-// https://stackoverflow.com/questions/3981510/getline-check-if-line-is-whitespace
 bool isEmpty( string line ) {
 
     istringstream iss( line );
