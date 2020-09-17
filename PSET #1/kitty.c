@@ -1,3 +1,7 @@
+// Derek Lee, Steven Lee, Shine Li
+// ECE-357 Computer Operating Systems
+// PSET #1 Question #3
+
 #include <string.h>
 #include <stdbool.h>
 #include <stdio.h>
