@@ -27,53 +27,30 @@ int main( int argc, char** argv ) {
   int fileCount = 0;     //  Used to increment files[]
   char* fileOut = "";    // Output string
 
-  int fdOut, errNum;
+  int fdOut, errNum, opt;
   // i = 0 is kitty
   int i = 1;
-
-  // Check if output file is specified
-  // Format [ -o OUTFILE ]
-  if ( argc >= 3 ) {
-
-    if ( argv[i][0] == '-' && argv[i][1] == 'o' ) {
-
-      fileOut = argv[i+1];
-      i += 2; // Skips the parsed arguments
-
-    }
-
-  }
-
-  // Open output file if not STDOUT
-  // Otherwise, use STDOUT
-  if ( fileOut != "" ) {
-
-    fdOut = open( fileOut, O_WRONLY | O_CREAT | O_TRUNC, 0666 );
-    if ( fdOut == -1 ) {
-
-      fprintf( stderr, "Cannot open output file: %s\n", fileOut );
-      perror( "Error:" );
-      return -1;
-
-    }
-
-  }
-  else
-    fdOut = STDOUT_FILENO;
 
   // Iterate through the rest of the arguments
   for ( ; i<argc; i++ ) {
 
     if ( argv[i][0] == '-' ) {
 
+      // Check if output file is specified
       if ( argv[i][1] == 'o' ) {
 
-        fprintf( stderr, "Error: Invalid argument for output file.\n" );
-        return -1;
+        fileOut = argv[i+1];
+        i++;
+        continue;
 
       }
 
-      // Check if - is a file
+    }
+
+    // Check if "-" is a file or STDIN
+    if ( strcmp( argv[i], "-" ) == 0 ) {
+
+      // Check if "-" is a file
       int fdTemp = open( argv[i], O_RDONLY );
       if ( fdTemp >= 0 ) {
 
@@ -89,11 +66,12 @@ int main( int argc, char** argv ) {
         }
 
       }
-      // Read stdin to output
+      // STDIN
       else
         files[ fileCount++ ] = STR_STDIN;
 
     }
+    // Regular input file
     else
       files[ fileCount++ ] = argv[i];
 
@@ -103,10 +81,28 @@ int main( int argc, char** argv ) {
   if ( fileCount == 0 )
     files[ fileCount++ ] = STR_STDIN;
 
+  // Open output file if not STDOUT
+  // Otherwise, use STDOUT
+  if ( fileOut != "" ) {
+
+    fdOut = open( fileOut, O_WRONLY | O_CREAT | O_TRUNC, 0666 );
+    if ( fdOut == -1 ) {
+
+      fprintf( stderr, "Cannot open output file: %s\n", fileOut );
+      perror( "Error" );
+      return -1;
+
+    }
+
+  }
+  else
+    fdOut = STDOUT_FILENO;
+
+
   int kittyResult;
 
   // Iterate through input files
-  for ( i=0; i<fileCount; i++ ) {
+  for ( int i=0; i<fileCount; i++ ) {
 
     kittyResult = kitty( files[i], fdOut );
 
@@ -139,7 +135,7 @@ int main( int argc, char** argv ) {
       }
 
       perror( "Error" );
-      return -1;
+      exit( -1 );
 
     }
 
@@ -243,7 +239,7 @@ int kitty( char* fileIn, int fdOut ) {
 
   }
 
-  fprintf( stderr, "\nTransferred %d bytes and made %d read system call(s) and %d write system call(s).\n",
+  fprintf( stderr, "Transferred %d bytes and made %d read system call(s) and %d write system call(s).\n",
            szTransferred, numReadCalls, numWriteCalls );
 
   if ( isBinary ) {
