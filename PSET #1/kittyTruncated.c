@@ -24,16 +24,15 @@ int main( int argc, char** argv ) {
   int fdOut, errNum, opt;
   // i = 0 is kitty
   int i = 1;
+  // Check if output file is specified
+  if ( argc >= 2 ) {
+    if ( argv[i][0] == '-' && argv[i][1] == 'o' ) {
+        fileOut = argv[i+1];
+        i += 2;
+    }
+  }
   // Iterate through the rest of the arguments
   for ( ; i<argc; i++ ) {
-    if ( argv[i][0] == '-' ) {
-      // Check if output file is specified
-      if ( argv[i][1] == 'o' ) {
-        fileOut = argv[i+1];
-        i++;
-        continue;
-      }
-    }
     // Check if "-" is a file or STDIN
     if ( strcmp( argv[i], "-" ) == 0 ) {
       // Check if "-" is a file
@@ -48,16 +47,13 @@ int main( int argc, char** argv ) {
         }
       }
       // STDIN
-      else
-        files[ fileCount++ ] = STR_STDIN;
+      else   files[ fileCount++ ] = STR_STDIN;
     }
     // Regular input file
-    else
-      files[ fileCount++ ] = argv[i];
+    else   files[ fileCount++ ] = argv[i];
   }
   // If no input file specified, read from STDIN
-  if ( fileCount == 0 )
-    files[ fileCount++ ] = STR_STDIN;
+  if ( fileCount == 0 )   files[ fileCount++ ] = STR_STDIN;
   // Open output file if not STDOUT
   // Otherwise, use STDOUT
   if ( fileOut != "" ) {
@@ -68,8 +64,7 @@ int main( int argc, char** argv ) {
       return -1;
     }
   }
-  else
-    fdOut = STDOUT_FILENO;
+  else   fdOut = STDOUT_FILENO;
   int kittyResult;
   // Iterate through input files
   for ( int i=0; i<fileCount; i++ ) {
@@ -92,7 +87,7 @@ int main( int argc, char** argv ) {
           break;
       }
       perror( "Error" );
-      exit( -1 );
+      return -1;
     }
   }
   // Close output file
@@ -117,11 +112,9 @@ int kitty( char* fileIn, int fdOut ) {
   if ( fileIn != STR_STDIN ) {
     fdIn = open( fileIn, O_RDONLY );
     // Opening input file error
-    if ( fdIn == -1 )
-      return -1;
+    if ( fdIn == -1 )   return -1;
   }
-  else
-    fdIn = STDIN_FILENO;
+  else   fdIn = STDIN_FILENO;
   // Read and write
   while (1) {
     szRead = read( fdIn, buf, SIZE_BUF );
@@ -141,33 +134,26 @@ int kitty( char* fileIn, int fdOut ) {
       numWriteCalls++;
       // No error
       // Writing 0 bytes should be an error
-      if ( szWrite > 0 )
-        szTransferred += szWrite;
+      if ( szWrite > 0 )   szTransferred += szWrite;
       // Write Error
-      else
-        return -3;
+      else   return -3;
     }
     // Reached EoF
-    else if ( szRead == 0 )
-      break;
+    else if ( szRead == 0 )   break;
     // Read Error
-    else
-      return -2;
+    else   return -2;
   }
   // Do not close STDIN
   if ( fdIn != STDIN_FILENO ) {
     // Error while closing
-    if ( close( fdIn ) < 0 )
-      return -4;
+    if ( close( fdIn ) < 0 )   return -4;
   }
   fprintf( stderr, "Transferred %d bytes and made %d read system call(s) and %d write system call(s).\n",
            szTransferred, numReadCalls, numWriteCalls );
   if ( isBinary ) {
     fprintf( stderr, "Warning: Binary file encountered: " );
-    if ( fdIn == STDIN_FILENO )
-      fprintf( stderr, "<standard input>\n" );
-    else
-      fprintf( stderr, "%s\n", fileIn );
+    if ( fdIn == STDIN_FILENO )   fprintf( stderr, "<standard input>\n" );
+    else   fprintf( stderr, "%s\n", fileIn );
   }
   return 0;
 }

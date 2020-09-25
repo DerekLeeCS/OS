@@ -35,21 +35,20 @@ int main( int argc, char** argv ) {
   // i = 0 is kitty
   int i = 1;
 
-  // Iterate through the rest of the arguments
-  for ( ; i<argc; i++ ) {
+  // Check if output file is specified
+  if ( argc >= 2 ) {
 
-    if ( argv[i][0] == '-' ) {
-
-      // Check if output file is specified
-      if ( argv[i][1] == 'o' ) {
+    if ( argv[i][0] == '-' && argv[i][1] == 'o' ) {
 
         fileOut = argv[i+1];
-        i++;
-        continue;
-
-      }
+        i += 2;
 
     }
+
+  }
+
+  // Iterate through the rest of the arguments
+  for ( ; i<argc; i++ ) {
 
     // Check if "-" is a file or STDIN
     if ( strcmp( argv[i], "-" ) == 0 ) {
@@ -71,19 +70,16 @@ int main( int argc, char** argv ) {
 
       }
       // STDIN
-      else
-        files[ fileCount++ ] = STR_STDIN;
+      else   files[ fileCount++ ] = STR_STDIN;
 
     }
     // Regular input file
-    else
-      files[ fileCount++ ] = argv[i];
+    else   files[ fileCount++ ] = argv[i];
 
   }
 
   // If no input file specified, read from STDIN
-  if ( fileCount == 0 )
-    files[ fileCount++ ] = STR_STDIN;
+  if ( fileCount == 0 )   files[ fileCount++ ] = STR_STDIN;
 
   // Open output file if not STDOUT
   // Otherwise, use STDOUT
@@ -99,8 +95,7 @@ int main( int argc, char** argv ) {
     }
 
   }
-  else
-    fdOut = STDOUT_FILENO;
+  else   fdOut = STDOUT_FILENO;
 
 
   int kittyResult;
@@ -133,13 +128,18 @@ int main( int argc, char** argv ) {
 
         case ( -4 ):
 
+          fprintf( stderr, "Partial write encountered\n" );
+          break;
+
+        case ( -5 ):
+
           fprintf( stderr, "Cannot close input file: %s\n", files[i] );
           break;
 
       }
 
       perror( "Error" );
-      exit( -1 );
+      return -1;
 
     }
 
@@ -158,7 +158,6 @@ int main( int argc, char** argv ) {
 
   }
 
-
   return 0;
 
 }
@@ -167,7 +166,8 @@ int main( int argc, char** argv ) {
 // Returns -1 for opening input file error
 // Returns -2 for read error
 // Returns -3 for write error
-// Returns -4 for closing input file error
+// Returns -4 for partial write error
+// Returns -5 for closing input file error
 int kitty( char* fileIn, int fdOut ) {
 
   int fdIn, szRead = 1, szWrite, szTransferred = 0;
@@ -180,12 +180,10 @@ int kitty( char* fileIn, int fdOut ) {
     fdIn = open( fileIn, O_RDONLY );
 
     // Opening input file error
-    if ( fdIn == -1 )
-      return -1;
+    if ( fdIn == -1 )   return -1;
 
   }
-  else
-    fdIn = STDIN_FILENO;
+  else   fdIn = STDIN_FILENO;
 
   // Read and write
   while (1) {
@@ -214,23 +212,20 @@ int kitty( char* fileIn, int fdOut ) {
 
       szWrite = write( fdOut, buf, szRead );
       numWriteCalls++;
+      if ( szWrite != szRead )   return -4;
 
       // No error
       // Writing 0 bytes should be an error
-      if ( szWrite > 0 )
-        szTransferred += szWrite;
+      if ( szWrite > 0 )   szTransferred += szWrite;
 
       // Write Error
-      else
-        return -3;
+      else   return -3;
 
     }
     // Reached EoF
-    else if ( szRead == 0 )
-      break;
+    else if ( szRead == 0 )   break;
     // Read Error
-    else
-      return -2;
+    else   return -2;
 
   }
 
@@ -238,8 +233,7 @@ int kitty( char* fileIn, int fdOut ) {
   if ( fdIn != STDIN_FILENO ) {
 
     // Error while closing
-    if ( close( fdIn ) < 0 )
-      return -4;
+    if ( close( fdIn ) < 0 )   return -5;
 
   }
 
@@ -249,10 +243,8 @@ int kitty( char* fileIn, int fdOut ) {
   if ( isBinary ) {
 
     fprintf( stderr, "Warning: Binary file encountered: " );
-    if ( fdIn == STDIN_FILENO )
-      fprintf( stderr, "<standard input>\n" );
-    else
-      fprintf( stderr, "%s\n", fileIn );
+    if ( fdIn == STDIN_FILENO )   fprintf( stderr, "<standard input>\n" );
+    else   fprintf( stderr, "%s\n", fileIn );
 
   }
 
