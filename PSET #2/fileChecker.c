@@ -12,25 +12,25 @@
 #define SIZE_ARR 4096
 
 // Recursive function
-int go_thru( char* filename );
+int fileChecker( char* filename );
 
-// Global ints
-int numFIFO, numFCHR, numFDIR, numFBLK, numFREG, numFLNK, numFSOCK;
-int numlink, sumOfSize, sumOfBlock, problem_name, numSymlink;
-numFIFO = numFCHR = numFDIR = numFBLK = numFREG = numFLNK = numFSOCK = 0;
-numlink = sumOfSize = sumOfBlock = problem_name = numSymlink = 0;
+// Global ints to count each diff files
+int numFIFO = 0, numFCHR = 0, numFDIR = 0, numFBLK = 0, numFREG = 0, numFLNK = 0, numFSOCK = 0;
+int numlink = 0, sumOfSize = 0, sumOfBlock = 0, badFileName = 0, numSymlink = 0;
 
 int main( int argc, char *argv[] ) {
 
+    // if input is not two (all function + path) print error
     char* start;
     if (argc != 2) {
 
-        fprintf( stderr, "Usage: %s <pathname>\n", argv[0] );
+        fprintf(stderr, "Usage: %s <pathname>\n", argv[0]);
         return -1;
     }
     else
         start = argv[1];
 
+    //go into function
     go_thru(start);
 
     printf("# of block device inodes:               %d.\n", numFBLK);
@@ -40,7 +40,7 @@ int main( int argc, char *argv[] ) {
     printf("# of symlink inodes:                    %d.\n", numFLNK);
     printf("# of regular file inodes:               %d.\n", numFREG);
     printf("# of sock inodes:                       %d.\n", numFSOCK);
-    printf("# of directory with problematic names:  %d.\n", problem_name);
+    printf("# of directory with problematic names:  %d.\n", badFileName);
     printf("Total size of all regular files:        %d.\n", sumOfSize);
     printf("Total disk blocks allocated:            %d.\n", sumOfBlock);
     printf("# of inodes with nlink > 1:             %d.\n", numlink);
@@ -50,7 +50,7 @@ int main( int argc, char *argv[] ) {
 
 }
 
-int go_thru( char* direc ) {
+int fileChecker( char* direc ) {
 
     DIR *dir;
     struct dirent *entry;
@@ -64,28 +64,46 @@ int go_thru( char* direc ) {
 
     }
 
+    // Read directory
     while ( ( entry = readdir(dir) ) != NULL ){
 
         char path[SIZE_ARR];
+
+        // Store each entry to path
         snprintf( path, sizeof(path), "%s/%s", direc, entry->d_name );
 
-        if (stat(path, &sb) < 0)
+        // Check if you can check stat
+        if ( stat(path, &sb) < 0 )
             fprintf( stderr, "Stat can not be shown %s: %s\n", path, strerror(errno) );
 
+        // Check if nlink > 1
         if ( ( ( sb.st_mode & S_IFMT ) != S_IFDIR ) && ( sb.st_nlink > 1 ) )
             numlink++;
 
-        if ( strstr( entry->d_name, '\'' ) || strstr( entry->d_name, "~" ) || !isprint(entry->d_name ) || isspace( entry->d_name ) )
-            problem_name++;
+        // Check the filename
+        char *name = entry->d_name;
+        for ( int i=0; i < strlen( name ); i++ ) {
+
+            if( name[i] == '\'' || name[i] == '~' || !isprint( name[i] ) || isspace( name[i] ) ) {
+
+                badFileName++;
+                break;
+
+            }
+
+        }
 
         printf( "File type: " );
+
         //checking each different cases, add the required stuff if you can (total number of diff cases, etc)
         switch ( sb.st_mode & S_IFMT ) {
 
             case S_IFREG:
 
+                //sum of the size and blocks
                 sumOfSize += sb.st_size;
                 sumOfBlock += sb.st_blocks;
+
                 printf( " Regular File\n" );
                 numFREG++;
                 break;
@@ -93,6 +111,7 @@ int go_thru( char* direc ) {
              case S_IFLNK:
 
                 printf( " Symbolic Link\n" );
+                //check for valid symlinks
                 if( access( path, F_OK ) == 0 )
                     numSymlink++;
                 else
@@ -106,9 +125,10 @@ int go_thru( char* direc ) {
                 printf( " Directory\n" );
                 numFDIR++;
 
-                if ( ( entry->d_name != "." ) || ( entry->d_name != ".." ) ){
-                    go_thru(path);
-                }
+                //if the path is not . and .. for directory, then go thru the function from the beginning
+                if ( !strcmp( entry->d_name, "." ) && !strcmp( entry->d_name, ".." ) )
+                    fileChecker(path);
+
                 break;
 
             case S_IFCHR:
@@ -141,56 +161,3 @@ int go_thru( char* direc ) {
     return 0;
 
 }
- /*case S_IFSOCK:
-                break;
-            case S_IFMPC:
-
-                break;
-            case S_IFNAM:
-
-                break;
-            case S_IFMPB:
-
-                break;
-            case S_IFCMP:
-
-                break;
-            case S_IFSHAD:
-
-                break;
-            case S_IFDOOR:
-
-                break;
-            case S_IFWHT:
-
-                break;
-            case S_IFPORT:
-
-                break;
-            */
-
-        /*if(entry->d_type == DT_DIR){
-            type+=1;
-
-            //check for the . and .. and ignore them
-            if ((entry->d_name == ".") && (entry->d_name == "..")){
-            }
-            else{
-                go_thru(path);
-            }
-        }
-        else if(entry->d_type == DT_REG){
-            printf("regular file\n");
-            sumOfSize += sb.st_size;
-            sumOfBlock += sb.st_blocks;
-            if(sb.st_nlink>1){
-                nlink1++;
-        }
-        else if(entry->d_type == DT_LNK){
-            if((readlink(path, link, SIZE_ARR) < 0) {
-                fprintf(stderr, "Cannot read symlink %s: %s\n", path, strerror(errno));
-                return -1;
-        }
-        else{
-
-        }*/
