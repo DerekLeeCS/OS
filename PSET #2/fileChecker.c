@@ -20,7 +20,7 @@ int numlink = 0, sumOfSize = 0, sumOfBlock = 0, badFileName = 0, numSymlink = 0;
 
 int main( int argc, char *argv[] ) {
 
-    // if input is not two (all function + path) print error
+    // If there aren't 2 arguments (function + pathname), print error
     char* start;
     if (argc != 2) {
 
@@ -30,8 +30,8 @@ int main( int argc, char *argv[] ) {
     else
         start = argv[1];
 
-    //go into function
-    go_thru(start);
+    // Start recursion
+    fileChecker(start);
 
     printf("# of block device inodes:               %d.\n", numFBLK);
     printf("# of character device inodes:           %d.\n", numFCHR);
@@ -125,7 +125,8 @@ int fileChecker( char* direc ) {
                 printf( " Directory\n" );
                 numFDIR++;
 
-                //if the path is not . and .. for directory, then go thru the function from the beginning
+                // If the path is not . and ..
+                // Then continue recursion
                 if ( !strcmp( entry->d_name, "." ) && !strcmp( entry->d_name, ".." ) )
                     fileChecker(path);
 
