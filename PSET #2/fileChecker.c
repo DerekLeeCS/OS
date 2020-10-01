@@ -1,8 +1,13 @@
+// Derek Lee, Shine Li, Steven Lee
+// ECE-357 Computer Operating Systems
+// PSET #2 Question #3
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdbool.h>
 #include <dirent.h>
 #include <ctype.h>
 #include <sys/types.h>
@@ -16,7 +21,7 @@
 struct info {
 
     // Stores volume of inode to ensure recursive search remains in the same volume
-    int volume = NULL;
+    int volume;
 
     // Stores inode numbers of inodes with multiple hardlinks
     // Prevents checking an inode with multiple hardlinks more than once
@@ -29,7 +34,9 @@ int fileChecker( char* filename );
 
 // Global ints to keep track of counts
 int numFIFO = 0, numFCHR = 0, numFDIR = 0, numFBLK = 0, numFREG = 0, numFLNK = 0, numFSOCK = 0;
-int numlink = 0, sumOfSize = 0, sumOfBlock = 0, badFileName = 0, numSymlink = 0;
+int numLink = 0, badFileName = 0, numSymLink = 0;
+long long sumOfSize = 0;
+long int sumOfBlock = 0;
 
 // Global struct
 struct info globInfo;
@@ -50,6 +57,7 @@ int main( int argc, char *argv[] ) {
     // Allocate size of multiNode array
     // Can store 10000 inodes
     globInfo.multiNode = malloc( 10000 * sizeof( int ) );
+    globInfo.volume = -1;
 
     // Start recursion
     fileChecker(start);
@@ -64,12 +72,12 @@ int main( int argc, char *argv[] ) {
     printf("# of sock inodes:                               %d.\n", numFSOCK);
     // b) for all regular files encountered, the sum of their sizes,
     // and the sum of the number of disk blocks allocated for them
-    printf("Total size of all regular files:                %d.\n", sumOfSize);
-    printf("Total disk blocks allocated:                    %d.\n", sumOfBlock);
+    printf("Total size of all regular files:                %lld.\n", sumOfSize);
+    printf("Total disk blocks allocated:                    %li.\n", sumOfBlock/8); // Divide by 8 b/c want blocks in 4k but have 512
     // c) # of inodes (except, of course, directories) which have a link count of more than 1
-    printf("# of inodes with nlink > 1:                     %d.\n", numlink);
+    printf("# of inodes with nlink > 1:                     %d.\n", numLink);
     // d) # of symlinks encountered that did not (at least at the time of the exploration) resolve to a valid target
-    printf("# of invalid symlinks:                          %d.\n", numSymlink);
+    printf("# of invalid symlinks:                          %d.\n", numSymLink);
     // e) # of directory entries encountered which would be "problematic" to enter at the keyboard
     printf("# of directory entries with problematic names:  %d.\n", badFileName);
 
@@ -99,51 +107,49 @@ int fileChecker( char* direc ) {
         // Store each entry to path
         snprintf( path, sizeof(path), "%s/%s", direc, entry->d_name );
 
-        // Check if file cannot be accessed
-        if ( access( path, R_OK ) != 0 ) {
-
-            fprintf( stderr, "Cannot access file (%s).\n", path );
-            perror( "Error" );
-            return -1;
-
-        }
-
         // Check if cannot read information about file
         if ( lstat(path, &sb) < 0 ) {
 
             fprintf( stderr, "Cannot read information about file (%s).\n", path );
             perror( "Error" );
-            return -1;
+            continue;
 
         }
 
         // If globInfo doesn't have a volume, assign current volume
         // Should only happen for initial call to fileChecker()
-        if ( globInfo.volume == NULL )
+        if ( globInfo.volume == -1 )
             globInfo.volume = sb.st_dev;
         // Check if inode is in the same volume
         else if ( globInfo.volume != sb.st_dev ) {
 
             fprintf( stderr, "Attempting to access an inode (%s) in a different volume.\n", path );
-            perror( "Error" );
-            return -1;
+            continue;
 
         }
 
         // Check if nlink > 1
         if ( ( ( sb.st_mode & S_IFMT ) != S_IFDIR ) && ( sb.st_nlink > 1 ) ) {
 
-            // Check if inode was previously encountered
-            for ( int i=0; i<numlink; i++ ) {
+            bool prevEncountered = false;
 
-                if ( globInfo.multiNode[i] == sb.st_ino )
-                    return -1;
+            // Check if inode was previously encountered
+            for ( int i=0; i<numLink; i++ ) {
+
+                if ( globInfo.multiNode[i] == sb.st_ino ) {
+
+                    prevEncountered = true;
+                    break;
+                }
 
             }
 
+            if ( prevEncountered )
+                continue;
+
             // Adds inode number to array of inodes with multiple hardlinks
             globInfo.multiNode[ numLink ] = sb.st_ino;
-            numlink++;
+            numLink++;
 
         }
 
@@ -183,7 +189,7 @@ int fileChecker( char* direc ) {
 
                     fprintf( stderr, "Symlink (%s) did not resolve to a valid target.\n", path );
                     perror( "Error" );
-                    numSymlink++;
+                    numSymLink++;
 
                 }
 
@@ -193,12 +199,12 @@ int fileChecker( char* direc ) {
             // Directory
             case S_IFDIR:
 
-                numFDIR++;
-
                 // If the path is not . and ..
                 // Then continue recursion
-                if ( !strcmp( entry->d_name, "." ) && !strcmp( entry->d_name, ".." ) )
+                if ( strcmp( entry->d_name, "." ) && strcmp( entry->d_name, ".." ) )
                     fileChecker(path);
+                else if ( strcmp( entry->d_name, "." ) == 0 )
+                    numFDIR++;
 
                 break;
 
@@ -223,12 +229,14 @@ int fileChecker( char* direc ) {
             // Unix unique files
             default:
 
-                printf( stderr, "File (%s) is unknown inode type (%s)", path, entry->d_type );
+                fprintf( stderr, "File (%s) is an unknown inode type.", path );
                 break;
 
         }
 
     }
+
+    closedir( dir );
 
     return 0;
 
