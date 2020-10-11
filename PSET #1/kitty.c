@@ -28,7 +28,7 @@ int kitty( char*, int );
 int main( int argc, char** argv ) {
 
   char* files[ argc-1 ]; // Array of strings
-  int fileCount = 0;     //  Used to increment files[]
+  int fileCount = 0;     // Used to increment files[]
   char* fileOut = "";    // Output string
 
   int fdOut, errNum, opt;
