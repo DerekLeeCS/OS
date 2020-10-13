@@ -14,9 +14,6 @@
 #define PATH_MAX 1024
 #define ARG_MAX 1024
 
-// Probably not needed
-// token = NULL line
-
 // Handles default commands
 bool shellCommands( char * );
 
@@ -27,7 +24,7 @@ int ioRedirect( char * );
 bool statusExit = false;
 int lastExitStatus = 0;
 
-int main() {
+int main( int argc, char *argv[] ) {
 
     char *str = NULL, *token = NULL;
     size_t size_buf = 1024;
@@ -37,27 +34,31 @@ int main() {
     struct timeval tvalEnd, tvalStart;
     struct rusage usage;
 
+    FILE *fp;
+
+    if ( argv[1] != NULL )
+        fp = fopen( argv[1], "r" );
+    else
+        fp = stdin;
+
     printf( "Shell execution started.\n\n" );
 
     // Stay in shell until exit command is received
     while( !statusExit ) {
 
-        // Read line from STDIN
-        getline( &str, &size_buf, stdin );
+        // Read line from fd
+        getline( &str, &size_buf, fp );
 
         // Reached EoF
-        if ( feof( stdin ) )
-            break;
+        if ( feof( fp ) )
+           break;
 
         // If line begins with #, ignore it
         if ( strncmp( str, "#", 1 ) == 0 )
             continue;
 
-        printf("\nProcessing input: %s", str);
-
         // Get the first token
         token = strtok( str, WHITESPACE );
-        printf("\tCurrent Token: %s\n", token);
 
         // Check if token is a shell command
         if ( shellCommands( token ) )
@@ -66,14 +67,20 @@ int main() {
         // Get start time
         gettimeofday( &tvalStart, NULL );
 
+        int id;
+        bool shouldExec = true;
+        int argCount = 0;
+        char *argVector[ARG_MAX];
+
         // Child
-        if ( fork() == 0 ) {
+        switch ( id = fork() ) {
 
-            printf( "In child\n" );
+        case -1:
 
-            bool shouldExec = true;
-            int argCount = 0;
-            char argVector[ARG_MAX][PATH_MAX];
+            perror( "Fork" );
+            return -1;
+
+        case 0:
 
             // Gets tokens one by one
             while ( token != NULL ) {
@@ -84,41 +91,26 @@ int main() {
                 // If any redirection fails, exit with an error status
                 if( retVal == -1 ) {
 
-                    fprintf(stderr, "Error redirecting I/O, exec() cancelled.\n");
                     shouldExec = false;
-                    lastExitStatus = -1;
+                    lastExitStatus = 1;
                     break;
 
                 }
                 // If ioRedirect() returns 1, it didn't fail, but the token was not a redirect instruction
                 else if( retVal == 1 ) {
 
-                    strcpy( argVector[argCount], token );
+                    argVector[argCount] = token;
                     argCount++;
-                    printf( "\t\tArgument recorded in argVector[%d]: %s\n", argCount-1, token ); // REMOVE THIS LINE AFTER YOU FINISH DEBUGGING, OTHERWISE IT'LL GET PRINTED TO THE STDOUT YOU REDIRECT TO
 
                 }
 
                 // Get next token
                 token = strtok( NULL, WHITESPACE );
-                printf( "\tCurrent Token: %s\n", token ); // REMOVE THIS LINE AFTER YOU FINISH DEBUGGING, OTHERWISE IT'LL GET PRINTED TO THE STDOUT YOU REDIRECT TO
-
-            } // closes while (token != NULL)
-
-            // TEST LOOP // REMOVE AFTER DEBUG
-            printf("\nFor Debugging - Contents of argVector are:\n");
-            for( int j=0; j<argCount; j++ ) {
-
-                // If you redirected stdout, this will print to there!
-                printf( "argVector[%d]: %s\n", j, argVector[j] );
 
             }
 
-            // argv should be NULL terminated (last element is NULL)
             if( shouldExec ) {
 
-                /* exec() stuff here */
-                // The command will be in argVector[0]
                 int err = execvp( argVector[0], argVector );
 
                 // Exec returns -1 on error
@@ -126,38 +118,62 @@ int main() {
 
                     fprintf( stderr, "Exec for command %s failed.\n", argVector[0] );
                     perror( "Error" );
-                    exit( 127 );
+                    lastExitStatus = 127;
 
                 }
 
             }
 
-            return 0;
+            // Clean up the child
+            fclose(fp);
+            return lastExitStatus;
+
+        default:
+
+            // Get end time
+            wait3( &ws, 0, &usage );
+            gettimeofday( &tvalEnd, NULL );
 
         }
 
-        // Get end time and exit status
-        wait3( &ws, 0, &usage );
-        gettimeofday( &tvalEnd, NULL );
-        lastExitStatus = WEXITSTATUS( ws );
+        // Get exit status
+        printf( "Child process %i exited ", id );
+        if ( WIFEXITED( ws ) ) {
+
+            lastExitStatus = WEXITSTATUS( ws );
+
+            if ( lastExitStatus == 0 )
+                printf( "normally\n" );
+            else if ( lastExitStatus > 0 )
+                printf( "with return value %i\n", lastExitStatus );
+
+        }
+        else if ( WIFSIGNALED( ws ) ) {
+
+            lastExitStatus = WTERMSIG( ws );
+            printf( "with signal %i (%s)\n", lastExitStatus, strsignal( lastExitStatus ) );
+            lastExitStatus += 128; // Update signal exit status
+
+        }
 
         // Measure time
-        printf( "\nReal Time: %f\n",
+        printf( "\nReal Time: %f(s) ",
             ( (double)( tvalEnd.tv_usec - tvalStart.tv_usec ) / 1000000
             + (double)( tvalEnd.tv_sec - tvalStart.tv_sec ) ) );
-        printf( "User Time: %f\n",
+        printf( "User Time: %f(s) ",
             ( (double)( usage.ru_utime.tv_usec ) / 1000000
             + (double)( usage.ru_utime.tv_sec ) ) );
-        printf( "System Time: %f\n\n",
+        printf( "System Time: %f(s)\n\n",
             ( (double)( usage.ru_stime.tv_usec ) / 1000000
             + (double)( usage.ru_stime.tv_sec ) ) );
 
-    }// closes while( !statusExit )
+    }
 
-    printf( "\nShell exiting with a status of: %d\n", lastExitStatus ); // For testing purposes
+    // Clean up parent
+    fclose(fp);
     return lastExitStatus;
 
-}// closes main()
+}
 
 
 // Handles default commands
@@ -174,7 +190,6 @@ bool shellCommands( char *token ) {
 
         // Gets next token
         token = strtok( NULL, WHITESPACE );
-        printf( "Changing directory to: %s \n\n", token );
 
         // If directory is specified, change to it
         if( token != NULL ) {
@@ -241,8 +256,6 @@ bool shellCommands( char *token ) {
 }
 
 
-
-
 // Returns -1 if an error was encountered
 // Returns 0 if redirection was successful
 // Returns 1 if token is not a redirection
@@ -256,18 +269,17 @@ int ioRedirect( char *token ) {
 	if( strncmp( token, "<", 1 ) == 0 ) {
 
 		memmove( filePath, filePath+1, strlen(filePath) );
-		printf("\t\tioRedirect: \'<\' detected, File Path: %s\n", filePath);
 
 		if ( ( fd=open(filePath, O_RDONLY, 0666) ) < 0 ) {
 
-			fprintf(stderr, "Couldn't open file (%s) while redirecting STDIN\n", filePath);
+			fprintf( stderr, "Couldn't open file (%s) while redirecting STDIN\n", filePath );
 			perror( "Error" );
 			return -1;
 
 		}
 		if ( dup2(fd,0) < 0 ) {
 
-            fprintf(stderr, "Couldn't dup2 fd of file (%s) to STDIN\n");
+            fprintf( stderr, "Couldn't dup2 fd of file (%s) to STDIN\n", filePath );
 			perror( "Error" );
 			return -1;
 
@@ -282,17 +294,16 @@ int ioRedirect( char *token ) {
 	if( strncmp( token, ">>", 2 ) == 0 ) {
 
 		memmove( filePath, filePath+2, strlen(filePath) );
-		printf( "\t\tioRedirect: \'>>\' detected, File Path: %s\n", filePath );
 
 		if ( ( fd=open(filePath, O_WRONLY|O_CREAT|O_APPEND, 0666) ) < 0 ) {
 
-            fprintf(stderr, "Couldn't open file (%s) while redirecting STDOUT (APPEND)\n", filePath);
+            fprintf( stderr, "Couldn't open file (%s) while redirecting STDOUT (APPEND)\n", filePath );
             perror( "Error" );
 			return -1;
 		}
 		if ( dup2(fd,1) < 0 ) {
 
-			fprintf(stderr, "Couldn't dup2 fd of file (%s) to STDOUT (APPEND)\n");
+			fprintf( stderr, "Couldn't dup2 fd of file (%s) to STDOUT (APPEND)\n", filePath );
 			perror( "Error" );
 			return -1;
 
@@ -307,18 +318,17 @@ int ioRedirect( char *token ) {
 	if( strncmp( token, ">", 1 ) == 0 ) {
 
 		memmove( filePath, filePath+1, strlen(filePath) );
-		printf( "\t\tioRedirect: \'>\' detected, File Path: %s\n", filePath );
 
 		if ( ( fd=open(filePath, O_WRONLY|O_CREAT|O_TRUNC, 0666) ) < 0 ) {
 
-			fprintf(stderr, "Couldn't open file (%s) while redirecting STDOUT (TRUNC)\n", filePath);
+			fprintf( stderr, "Couldn't open file (%s) while redirecting STDOUT (TRUNC)\n", filePath );
 			perror( "Error" );
 			return -1;
 
 		}
 		if ( dup2(fd,1) < 0 ) {
 
-			fprintf(stderr, "Couldn't dup2 fd of file (%s) to STDOUT (TRUNC)\n");
+			fprintf( stderr, "Couldn't dup2 fd of file (%s) to STDOUT (TRUNC)\n", filePath );
 			perror( "Error" );
 			return -1;
 
@@ -333,18 +343,17 @@ int ioRedirect( char *token ) {
 	if( strncmp( token, "2>>", 3 ) == 0 ) {
 
 		memmove( filePath, filePath+3, strlen(filePath) );
-		printf( "\t\tioRedirect: \'2>>\' detected, File Path: %s\n", filePath );
 
 		if ( ( fd=open(filePath, O_WRONLY|O_CREAT|O_APPEND, 0666) ) < 0 ) {
 
-			fprintf(stderr, "Couldn't open file (%s) while redirecting STDERR (APPEND)\n", filePath);
+			fprintf( stderr, "Couldn't open file (%s) while redirecting STDERR (APPEND)\n", filePath );
 			perror( "Error" );
 			return -1;
 
 		}
 		if ( dup2(fd,2) < 0 ) {
 
-			fprintf(stderr, "Couldn't dup2 fd of file (%s) to STDERR (APPEND)\n");
+			fprintf( stderr, "Couldn't dup2 fd of file (%s) to STDERR (APPEND)\n", filePath );
 			perror( "Error" );
 			return -1;
 
@@ -360,17 +369,16 @@ int ioRedirect( char *token ) {
 	if( strncmp( token, "2>", 2 ) == 0 ) {
 
 		memmove( filePath, filePath+2, strlen(filePath) );
-		printf("\t\tioRedirect: \'2>\' detected, File Path: %s\n", filePath);
 
 		if ( ( fd=open(filePath, O_WRONLY|O_CREAT|O_TRUNC, 0666) ) < 0 ) {
 
-			fprintf(stderr, "Couldn't open file (%s) while redirecting STDERR (TRUNC)\n", filePath);
+			fprintf( stderr, "Couldn't open file (%s) while redirecting STDERR (TRUNC)\n", filePath );
 			perror( "Error" );
 			return -1;
 		}
 		if ( dup2(fd,2) < 0 ) {
 
-			fprintf(stderr, "Couldn't dup2 fd of file (%s) to STDERR (TRUNC)\n");
+			fprintf( stderr, "Couldn't dup2 fd of file (%s) to STDERR (TRUNC)\n", filePath );
 			perror( "Error" );
 			return -1;
 
