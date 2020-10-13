@@ -36,12 +36,24 @@ int main( int argc, char *argv[] ) {
 
     FILE *fp;
 
-    if ( argv[1] != NULL )
+    // If given a file, try to open it
+    if ( argv[1] != NULL ) {
+
         fp = fopen( argv[1], "r" );
+        if ( fp == NULL ) {
+
+          fprintf( stderr, "Cannot open input file: %s\n", argv[1] );
+          perror( "Error" );
+          lastExitStatus = -1;
+          statusExit = true;
+
+        }
+
+    }
     else
         fp = stdin;
 
-    printf( "Shell execution started.\n\n" );
+    fprintf( stderr, "Shell execution started.\n\n" );
 
     // Stay in shell until exit command is received
     while( !statusExit ) {
@@ -137,33 +149,33 @@ int main( int argc, char *argv[] ) {
         }
 
         // Get exit status
-        printf( "Child process %i exited ", id );
+        fprintf( stderr, "Child process %i exited ", id );
         if ( WIFEXITED( ws ) ) {
 
             lastExitStatus = WEXITSTATUS( ws );
 
             if ( lastExitStatus == 0 )
-                printf( "normally\n" );
+                fprintf( stderr, "normally\n" );
             else if ( lastExitStatus > 0 )
-                printf( "with return value %i\n", lastExitStatus );
+                fprintf( stderr, "with return value %i\n", lastExitStatus );
 
         }
         else if ( WIFSIGNALED( ws ) ) {
 
             lastExitStatus = WTERMSIG( ws );
-            printf( "with signal %i (%s)\n", lastExitStatus, strsignal( lastExitStatus ) );
+            fprintf( stderr, "with signal %i (%s)\n", lastExitStatus, strsignal( lastExitStatus ) );
             lastExitStatus += 128; // Update signal exit status
 
         }
 
         // Measure time
-        printf( "\nReal Time: %f(s) ",
+        fprintf( stderr, "\nReal Time: %f(s) ",
             ( (double)( tvalEnd.tv_usec - tvalStart.tv_usec ) / 1000000
             + (double)( tvalEnd.tv_sec - tvalStart.tv_sec ) ) );
-        printf( "User Time: %f(s) ",
+        fprintf( stderr, "User Time: %f(s) ",
             ( (double)( usage.ru_utime.tv_usec ) / 1000000
             + (double)( usage.ru_utime.tv_sec ) ) );
-        printf( "System Time: %f(s)\n\n",
+        fprintf( stderr, "System Time: %f(s)\n\n",
             ( (double)( usage.ru_stime.tv_usec ) / 1000000
             + (double)( usage.ru_stime.tv_sec ) ) );
 
@@ -171,6 +183,7 @@ int main( int argc, char *argv[] ) {
 
     // Clean up parent
     fclose(fp);
+    fprintf( stderr, "Reached EoF. Exiting with exit code %i\n", lastExitStatus );
     return lastExitStatus;
 
 }
@@ -225,7 +238,7 @@ bool shellCommands( char *token ) {
 
         char currentDir[PATH_MAX];
         if( getcwd( currentDir, sizeof(currentDir) ) )
-            printf( "Current working directory: %s\n\n", currentDir );
+            fprintf( stderr, "Current working directory: %s\n\n", currentDir );
         else {
 
             fprintf( stderr, "Could not getcwd()\n" );
