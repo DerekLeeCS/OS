@@ -94,6 +94,10 @@ int main( int argc, char *argv[] ) {
 
         case 0:
 
+            // Clean file descriptor environment for the child
+            if ( fp != stdin )
+                fclose(fp);
+
             // Gets tokens one by one
             while ( token != NULL ) {
 
@@ -136,8 +140,6 @@ int main( int argc, char *argv[] ) {
 
             }
 
-            // Clean up the child
-            fclose(fp);
             return lastExitStatus;
 
         default:
@@ -182,7 +184,9 @@ int main( int argc, char *argv[] ) {
     }
 
     // Clean up parent
-    fclose(fp);
+    if ( fp != stdin )
+        fclose(fp);
+
     fprintf( stderr, "Reached EoF. Exiting with exit code %i\n", lastExitStatus );
     return lastExitStatus;
 
