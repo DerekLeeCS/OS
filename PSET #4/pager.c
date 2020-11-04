@@ -4,14 +4,32 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #define NUM_LINES 23
 #define BUF_SIZE 4096
 
 bool checkInput( char* );
-bool readDevTTY();
+bool readDevTTY( int );
 
 int main( int argc, char* argv[] ) {
+
+    if( !freopen(argv[1], "r", stdin) ) {
+
+        fprintf( stderr, "Error: Redirection of stdin to (%s) failed.\n", argv[1]);
+        perror( "Error" );
+        return -1;
+
+    }
+
+    int terminalFd;
+    if( (terminalFd = open("/dev/tty", O_RDWR, 0666)) < 0 ) {
+
+        fprintf( stderr, "Error: Could not open terminal\n" );
+        perror( "Error" );
+        exit(EXIT_FAILURE);
+
+    }
 
     bool loop = true;
     size_t size_buf = BUF_SIZE;
@@ -24,17 +42,26 @@ int main( int argc, char* argv[] ) {
             // Read from STDIN
             getline( &str, &size_buf, stdin );
 
-            // If input is an exit argument
-            if( checkInput( str ) )
+            // If input is EoF
+            if( feof( stdin ) )
                 return 0;
 
             // Print to STDOUT
-            printf( "%s\n", str );
+            fprintf( stdout, "%s", str );
 
         }
 
-        fprintf( stderr, "---Press RETURN for more---\n" );
-        loop = readDevTTY();
+        char message[] = "---Press RETURN for more---\n";
+        write( terminalFd, message, strlen(message) );
+        loop = readDevTTY( terminalFd );
+
+    }
+
+    if( close(terminalFd) != 0 ) {
+
+        fprintf( stderr, "Error: Cannot close /dev/tty.\n" );
+        perror( "Error" );
+        exit( EXIT_FAILURE );
 
     }
 
@@ -53,8 +80,12 @@ bool checkInput( char* str ) {
     // Input is q or Q
     if ( strlen( str ) == 2 ) {
 
-        if ( tolower( str[0] ) == 'q' )
+        if ( tolower( str[0] ) == 'q' ) {
+
+            fprintf( stderr, "*** Pager terminated by Q command ***\n\n\n" );
             return true;
+
+        }
 
     }
 
@@ -63,30 +94,12 @@ bool checkInput( char* str ) {
 }
 
 
-bool readDevTTY() {
+bool readDevTTY(int terminalFd) {
 
     size_t size_buf = BUF_SIZE;
-    char* str = NULL;
+    char str[BUF_SIZE];
 
-    FILE *fp = fopen( "/dev/tty", "r" );
-    if ( fp == NULL ) {
-
-        fprintf( stderr, "Error: Cannot open /dev/tty.\n" );
-        perror( "Error" );
-        exit( EXIT_FAILURE );
-
-    }
-
-    getline( &str, &size_buf, fp );
-
-    // Close the file
-    if( fclose(fp) != 0 ) {
-
-        fprintf( stderr, "Error: Cannot close /dev/tty.\n" );
-        perror( "Error" );
-        exit( EXIT_FAILURE );
-
-    }
+    read( terminalFd, str, size_buf );
 
     // If input is an exit argument
     if ( checkInput( str ) )
