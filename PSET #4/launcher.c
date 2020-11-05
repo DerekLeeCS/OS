@@ -5,7 +5,6 @@
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <sys/types.h>
-#include <setjmp.h>
 
 void performDup( int, int );
 void closePipe( int );
@@ -13,30 +12,18 @@ int runProcess( int[2], int, char*, char*[], bool );
 void checkStatus( int );
 
 
-jmp_buf wormhole;
-
-void handler( int sig ) {
-
-    static int i;
-    i++;
-    fprintf( stderr, "In handler instance %d\n", i );
-    longjmp( wormhole, i );
-
-}
-
-
 int main( int argc, char *argv[] ) {
 
     char* numWords;
 
     if ( argc == 2 )
-	numWords = argv[1];
+        numWords = argv[1];
     else if ( argc == 1 )
-	numWords = NULL;
+        numWords = (char*)NULL;
     else {
 
-	fprintf( stderr, "Error: Incorrect format for arguments.\n" );
-	exit( EXIT_FAILURE );
+        fprintf( stderr, "Error: Incorrect format for arguments.\n" );
+        exit( EXIT_FAILURE );
 
     }
 
@@ -59,9 +46,9 @@ int main( int argc, char *argv[] ) {
     pidChild[1] = runProcess( pipeTwoFds, pipeOneFds[0], "./wordsearch", cmd2, true );
     pidChild[2] = runProcess( pipeTwoFds, 2, "./pager", cmd3, false );
 
-    checkStatus( pidChild[0] );
-    checkStatus( pidChild[1] );
     checkStatus( pidChild[2] );
+    checkStatus( pidChild[1] );
+    checkStatus( pidChild[0] );
 
     return 0;
 
@@ -105,8 +92,10 @@ int runProcess( int fdPipe[2], int fdPipeType, char* progName, char* cmd[], bool
     }
     // Child 2
     else {
-	fdPipeDup = fdPipe[1];
+
+        fdPipeDup = fdPipe[1];
         boolPipe2 = true;
+
     }
 
     switch( pidChild = fork() ) {
@@ -119,25 +108,26 @@ int runProcess( int fdPipe[2], int fdPipeType, char* progName, char* cmd[], bool
 
     // In child
 	case 0:
+
+	    // Pipe 1&2
+	    if ( boolPipe2 || fdPipeType == 0 )
+            	closePipe( fdPipe[0] );
+
 	    // Pipe 1&3
-	    if ( !boolPipe2 ) {
-		if( fdPipeType == 0 )
-	            closePipe( fdPipe[0] );
-		performDup( fdPipeDup, stdFileNo );
-	    }
-        // Pipe 2
+	    if ( !boolPipe2 )
+                performDup( fdPipeDup, stdFileNo );
+            // Pipe 2
 	    else {
-//            closePipe( fdPipe[0] );
 
-            // Redirect stdin to the read end of pipe one
-            performDup( fdPipeType, STDIN_FILENO );
+            	// Redirect stdin to the read end of pipe one
+            	performDup( fdPipeType, STDIN_FILENO );
 
-            // Redirect stdout to the write end of pipe two
-            performDup( fdPipe[1], STDOUT_FILENO );
+            	// Redirect stdout to the write end of pipe two
+            	performDup( fdPipe[1], STDOUT_FILENO );
 
 	    }
 
-	    // exec() the new process
+ 	    // exec() the new process
 	    if( execvp( progName, cmd ) == -1 ) {
 
             fprintf( stderr, "Error: execvp() failed on program %s.\n", progName );
@@ -146,25 +136,24 @@ int runProcess( int fdPipe[2], int fdPipeType, char* progName, char* cmd[], bool
 
 	    }
 
-	    break;  /////////////////////////////////////////////// just to be safe
+	    // Just to be safe
+	    break;
 
     // In parent
 	default:
 
+        // Pipe 2
+        if ( boolPipe2 )
+            closePipe( fdPipeType );
+
         // Pipe 1&2
-        if ( fdPipeType != 2 ) {
+        if ( fdPipeType != 2 )
+            closePipe( fdPipeDup ); // Close the write end of the pipe
 
-            // Close the write end of the pipe
-            closePipe( fdPipeDup );
-
-	    if( boolPipe2 )
-		closePipe( fdPipeType );
-        }
         // Pipe 3
-        else {
-            // Close the read end of the pipe
-            closePipe( fdPipe[0] );
-        }
+        else
+            closePipe( fdPipe[0] ); // Close the read end of the pipe
+
 
     }
 
@@ -202,6 +191,7 @@ void checkStatus( int pidChild ) {
     int status;
 
     waitpid( pidChild, &status, 0 );
+
     // Check if child exited normally
     if( WIFEXITED(status) ) {
 

@@ -4,16 +4,26 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <signal.h>
+#include <setjmp.h>
 
 #define BUF_SIZE 4096
 #define MAX_WORDS 1000000
 #define LEN_MAX 15
 
-
 void loadDictionary( char[][LEN_MAX+1], FILE* );
 void checkDictionary( char[][LEN_MAX+1] );
 
 int curPos = 0;
+jmp_buf wormhole;
+
+void handler( int sig ) {
+
+    int id = getpid();
+    fprintf( stderr, "PID %d received signal %d.\n", id, sig );
+    longjmp( wormhole, id );
+
+}
 
 int main( int argc, char* argv[] ) {
 
@@ -84,19 +94,25 @@ void checkDictionary( char dictionary[][LEN_MAX+1] ) {
     char* str = NULL;
     int numMatch = 0;
 
-    while ( getline( &str, &size_buf, stdin ) != -1 ) {
+    signal( SIGPIPE, handler );
 
-        // Convert to uppercase
-        for ( char *it=str; *it != '\0'; it++ )
-            *it = toupper( *it );
+    if ( !setjmp( wormhole ) ) {
 
-        for ( int i=0; i<curPos; i++ ) {
+        while ( getline( &str, &size_buf, stdin ) != -1 ) {
 
-            if ( strcmp( str, dictionary[i] ) == 0 ) {
+            // Convert to uppercase
+            for ( char *it=str; *it != '\0'; it++ )
+                *it = toupper( *it );
 
-                printf( "%s", str );
-                numMatch++;
-                break;
+            for ( int i=0; i<curPos; i++ ) {
+
+                if ( strcmp( str, dictionary[i] ) == 0 ) {
+
+                    printf( "%s", str );
+                    numMatch++;
+                    break;
+
+                }
 
             }
 

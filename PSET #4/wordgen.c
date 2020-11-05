@@ -23,7 +23,7 @@ int main( int argc, char* argv[] ) {
     else if ( argc == 2 )
         numWords = atoi( argv[1] );
     else
-        numWords = -1;
+        numWords = 0;
 
     int count = 0;
     int wordLen;
@@ -32,22 +32,21 @@ int main( int argc, char* argv[] ) {
     // Seed PRNG
     srand( (unsigned)time(0) );
 
-
     while( 1 ) {
-
-        // Break out of loop once limit is reached
-        if ( count == numWords )
-            break;
 
         // Get random length
         wordLen = rand() % ( LEN_MAX - LEN_MIN + 1 );
-        wordLen += LEN_MIN;
+	wordLen += LEN_MIN;
 
         // Get random word
         randWord( wordLen, word );
 
-        printf( "%s\n", word );
+	printf( "%s\n", word );
         count++;
+
+        // Break out of loop once limit is reached
+        if ( count == numWords )
+            break;
 
     }
 

@@ -82,7 +82,7 @@ bool checkInput( char* str ) {
 
         if ( tolower( str[0] ) == 'q' ) {
 
-            fprintf( stderr, "*** Pager terminated by Q command ***\n\n\n" );
+            fprintf( stderr, "*** Pager terminated by Q command ***\n\n" );
             return true;
 
         }
