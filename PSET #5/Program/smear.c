@@ -75,6 +75,15 @@ int main( int argc, char* argv[] ) {
 
 		changeFile( stringTarget, stringReplacement, addr );
 
+        // Sync to ensure changes are mapped back to filesystem
+        if ( msync( addr, sz, MS_SYNC ) < 0 ) {
+
+            fprintf( stderr, "Error: Cannot sync file (%s).\n", fileNames[i] );
+			perror( "Error" );
+			exit( EXIT_FAILURE );
+
+        }
+
 		// Unmap
 		if ( munmap( addr, sz ) < 0 ) {
 
