@@ -1,4 +1,4 @@
-#include "spin.h"
+#include "sem.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,27 +9,27 @@
 
 
 #define N_PROC 64	// Maximum number of processors supported
-#define LOCK 1		// 1 -> Use spin lock
-#define DEBUG 0		// 1 -> Print debugging messages
+#define DEBUG 1		// 1 -> Print debugging messages
+#define N_TESTING 8	// Number of processes we're testing with
 
 // Checks the status of a child process
 void checkStatus( int );
 
 // Holds the PIDs for each process
 int my_procnum[ N_PROC ];
-
-
 int main() {
 
-	char *addr;
+	// mmap a semaphore to be shared among child processes
+	struct sem *s = (struct sem *)mmap( NULL, sizeof( struct sem ), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0 );
 
-	struct mutex *lp = (struct mutex *)mmap( NULL, sizeof( struct mutex ), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0 );
+	// Initialize the semaphore
+	// In this test, "producer" processes will add to the total resources
+	// "consumer" processes will wait until a resource is available before "using" it
+	sem_init( s, 0 );
 
-	// Initialize the struct
-	lp->count = 0;
-	lp->lock = 0;
-
-	for ( int i=0; i<3; i++ ) {
+	// odd i are consumers (calls sem_wait)
+	// even i are producers (calls sem_inc)
+	for ( int i=0; i<N_TESTING; i++ ) {
 
 		switch ( my_procnum[i] = fork() ) {
 
@@ -44,28 +44,18 @@ int main() {
 			if ( DEBUG )
 				fprintf( stderr, "PID %d from parent PID %d\n", getpid(), getppid() );
 
-			for ( int j=0; j<100000; j++ ) {
-
-				// Use a spin lock
-				if ( LOCK ) {
-
-					if ( spin_lock( lp ) ) {
-
-						lp->count++;
-						spin_unlock( lp );
-
-					}
-
-				} else {
-
-					lp->count++;
-
+			// Each consumer calls sem_wait 1000 times
+			// Each producer calls sem_inc 1000 times
+			for ( int j=0; j<10000; j++ ) {
+				printf("%d\n", j);
+				if ( i % 2 ) {
+					sem_wait( s );
+				}
+				else {
+					sem_inc( s );
 				}
 
 			}
-
-			if ( DEBUG )
-				fprintf( stderr, "Child Count: %d\n", lp->count );
 
 			exit( EXIT_SUCCESS );
 
@@ -74,10 +64,8 @@ int main() {
 	}
 
 	// Check each child process
-	for ( int i=0; i<3; i++ )
+	for ( int i=0; i<N_TESTING; i++ )
 		checkStatus( my_procnum[i] );
-
-	fprintf( stderr, "Final Count: %d\n", lp->count );
 
 }
 
