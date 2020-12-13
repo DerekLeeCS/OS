@@ -1,7 +1,4 @@
-all: testFifo testSem
+all: main
 
-testSem:
-	gcc -o testSem testSem.c sem.c spin.c tas64.S
-
-testFifo:
-	gcc -o testFifo testFifo.c fifo.c sem.c spin.c tas64.S
+main:
+	gcc -o main main.c fifo.c sem.c spin.c tas64.S

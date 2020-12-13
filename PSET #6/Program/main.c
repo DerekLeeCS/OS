@@ -13,8 +13,8 @@
 			// FOR NOW, LEAVE N_READER AT 1
 			// We're testing one reader, multiple writers. We'll test multiple readers later.
 
-#define N_WRITER 8	// Number of processes that write to the FIFO. Must be at least one.
-#define N_WRCOUNT 10000	// Number of times each writer writes to the FIFO
+#define N_WRITER 1	// Number of processes that write to the FIFO. Must be at least one.
+#define N_WRCOUNT 1000	// Number of times each writer writes to the FIFO
 			// Keep this less than INT_MAX, okay?
 
 int my_procnum[ N_PROC ];
